@@ -1,0 +1,37 @@
+stages:
+  - build
+  - deploy
+
+create docker image:
+  stage: build
+  image:
+    name: docker:20.10.16
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  services:
+    - docker:20.10.16-dind
+  before_script:
+    - docker info
+  script:
+    - docker login -u ${DOCKER_USER} -p ${DOCKER_PASSWORD}
+    - docker build -t thangap05/demo-nsearch:latest .
+    - docker push thangap05/demo-nsearch:latest
+  rules:
+    - if: '$CI_COMMIT_REF_NAME == "main"'
+      when: always
+
+deploy to s3:
+  stage: deploy
+  image:
+    name: amazon/aws-cli
+    entrypoint: [""]
+  script:
+    - aws --version
+    - aws s3api put-object --key src/app.css --bucket $S3_EXT_EP --body ./src/app.css
+    - aws s3api put-object --key src/app.js --bucket $S3_EXT_EP --body ./src/app.js
+    - aws s3api put-object --key src/index.html --bucket $S3_EXT_EP --body ./src/index.html
+    - aws autoscaling start-instance-refresh --auto-scaling-group-name demo-asg-group
+
+  rules:
+    - if: '$CI_COMMIT_REF_NAME == "main"'
+      when: always
